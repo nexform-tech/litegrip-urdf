@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>litegrip_urdf</name>
+  <version>1.0.0</version>
+  <description>
+    Robot description (URDF/xacro) and ROS 2 control configuration for the
+    LiteGrip parallel gripper. Provides visualization, simulation and
+    ros2_control hardware interface definitions.
+  </description>
+
+  <!-- ⚠ 发布前必填：维护者信息 -->
+  <maintainer email="TODO@example.com">LiteGrip</maintainer>
+
+  <license>BSD-3-Clause</license>
+
+  <url type="website">https://example.com/litegrip</url>
+  <url type="bugtracker">https://example.com/litegrip/issues</url>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <!-- 描述文件与 launch 运行期依赖 -->
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <!-- ros2_control 运行期依赖 -->
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>position_controllers</exec_depend>
+  <exec_depend>ros2_control</exec_depend>
+  <exec_depend>ros2_controllers</exec_depend>
+  <exec_depend>hardware_interface</exec_depend>
+
+  <!-- Gazebo Classic 仿真（可选；未安装时仅 gazebo.launch.py 不可用） -->
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>gazebo_ros2_control</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,48 @@
+# ros2_control 控制器配置
+#
+# ⚠ 参数层级说明（两个都踩过的坑，改动前请先读）：
+#
+#   1) 控制器自身的参数必须写成【独立节点段】，即顶层键为控制器名：
+#          gripper_controller:
+#            ros__parameters:
+#              joints: [...]
+#      不要写成 controller_manager 下的嵌套参数：
+#          controller_manager:
+#            ros__parameters:
+#              gripper_controller:
+#                joints: [...]
+#      后者 controller_manager 只读取其中的 type 用于加载控制器，
+#      不会把 joints 转交给控制器节点，会报 "'joints' parameter was empty"。
+#
+#   2) launch 中不要给 ros2_control_node 显式指定 name='controller_manager'。
+#      显式指定会追加 `-r __node:=controller_manager` 重映射并被控制器继承，
+#      使所有控制器节点都叫 /controller_manager，第 1 条中的独立段随之失配。
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    gripper_controller:
+      type: position_controllers/JointGroupPositionController
+
+gripper_controller:
+  ros__parameters:
+    # ⚠ 两关节 axis 方向相反（right = +X, left = -X），
+    #   因此下发指令时两关节取【同号值】才能使两指同向运动。
+    #   数组顺序即指令顺序：
+    #     [0] gripper_slide_joint_right
+    #     [1] gripper_slide_joint_left
+    #   0.0     -> 最大张开（两指内侧面 x = ±0.0435，开口 87 mm）
+    #   0.0435  -> 完全闭合（两指内侧面在 x = 0 贴合）
+    joints:
+      - gripper_slide_joint_right
+      - gripper_slide_joint_left
+
+# ---------------------------------------------------------------------------
+# 说明：若需基于 Action 的抓取接口，可改用
+#   position_controllers/GripperActionController
+# 但该控制器只接受【单个】关节，需要为另一指配置 <mimic> 关节，
+# 且 mimic 在 ros2_control 中不会自动生效（依赖硬件接口或仿真器支持），
+# 故此处默认采用支持多关节的 JointGroupPositionController。

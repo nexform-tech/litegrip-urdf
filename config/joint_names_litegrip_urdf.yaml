@@ -1,0 +1,5 @@
+# 关节名清单，供 MoveIt Setup Assistant 等工具导入使用。
+# 顺序与 URDF 中 <joint> 的声明顺序一致。
+controller_joint_names:
+  - gripper_slide_joint_right
+  - gripper_slide_joint_left
