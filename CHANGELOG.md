@@ -35,6 +35,22 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ### Changed
 
+- Recorded the current physical calibration result: closed clearance `1.508 mm`, open
+  opening `86.960 mm`, total mechanical stroke `85.452 mm`, per-finger URDF stroke
+  `0.042726 m`, closed/open motor angles `0.041390` / `-1.272793 rad`, angular range
+  `1.314183 rad`, and `rad_to_mm = 65.0229 mm/rad`.
+- Recorded three stable `calibrate_guided` measurements and five endpoint rechecks. The
+  rechecked mechanical stroke was `85.43–85.47 mm`, and the corresponding
+  `rad_to_mm` values were `65.0053–65.0372 mm/rad`.
+- Recorded the six-point caliper position test and the 50-cycle repeatability data. The
+  position test remains pending final acceptance because the 20 mm group contains an
+  `18.80 mm` reading, which produces a `1.20 mm` maximum absolute error. In the 50-cycle
+  test over `2 mm ↔ 83 mm`, the closed/open opening drift was `+0.01` / `+0.02 mm`, and
+  both endpoint angle drifts were `+0.000009 rad`.
+- Updated the xacro and launch defaults from the old nominal `0.0435 m` to the measured
+  `0.042726 m` per-finger stroke. Force, speed, damping, friction, hardware integration,
+  the `calibrate_guided` source logic, and runtime Gazebo/TF validation remain uncalibrated
+  or unverified.
 - `README.md` is now written in English as the repository default; the previous Chinese
   content was revised and moved to `README.zh-CN.md`. Both versions cross-link.
 
@@ -62,8 +78,9 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
   environment.
 - The Python SDK's calibration routine does not measure the gripper's stroke: it derives
   its mm scale by dividing an **assumed** stroke by the measured angular range. The
-  shipped assumption is 120 mm while the true mechanical stroke of this gripper is 87 mm,
-  so as shipped every millimetre reading is 1.38× too large. Eight further
+  shipped assumption is 120 mm while the measured total mechanical stroke of this gripper
+  is 85.452 mm (42.726 mm per finger), so as shipped every millimetre reading is about
+  1.404× too large. Eight further
   inconsistencies in the SDK are catalogued in
   [docs/calibration-guide.md](docs/calibration-guide.md#known-inconsistencies-in-the-sdk).
 
