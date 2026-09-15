@@ -66,7 +66,7 @@ ros2 run joint_state_publisher joint_state_publisher
 
 ```bash
 ros2 topic pub --once /gripper_controller/commands \
-  std_msgs/msg/Float64MultiArray "{data: [0.05, 0.05]}"   # stroke 为 0.0435
+  std_msgs/msg/Float64MultiArray "{data: [0.05, 0.05]}"   # stroke 为 0.042726；0.05 故意作为越界测试值
 ros2 topic echo --once /joint_states
 # position:
 # - 0.05
@@ -97,6 +97,7 @@ mock 硬件没有 effort 值可发布。
 
 **修复。** 无需处理 —— 这是预期行为。若下游消费方要求数值化的 effort，
 要么新增 `effort` state 接口并由你的硬件插件提供，要么在消费方过滤 `NaN`。
+这也不代表允许最大夹持力已经完成标定；`effort` 限值仍需经过力矩—夹持力测试后确定。
 
 ---
 
@@ -159,6 +160,8 @@ controller_manager:
 
 **原因。** Gazebo Classic 是可选依赖，默认未安装。
 **验证本包的环境中并未安装 Gazebo，因此 `gazebo.launch.py` 从未执行过，必须视为未经验证。**
+因此，虽然本机已经完成机械行程和角度标定，更新后的 `0.042726 m` 行程限位在
+Gazebo 中的 mesh、TF 和控制器行为仍不能视为已验证。
 
 **修复。** 安装仿真依赖：
 
@@ -184,7 +187,9 @@ sudo apt install ros-humble-gazebo-ros-pkgs ros-humble-gazebo-ros2-control
 | `夹爪urdf2 (1).urdf` | `upper value (0.043.5) is not a valid float` |
 
 **修复。** 使用本包中的 `urdf/litegrip_urdf.urdf.xacro`。两份中间文件都不能作为参照 ——
-尤其**不要从中拷贝 `0.067` 的行程限位**；正确推导见
+尤其**不要从中拷贝 `0.067` 的行程限位**。当前本机实测单指行程为 `0.042726 m`，
+总机械行程为 `85.452 mm`；`0.0435 m` 仅是由 mesh 包围盒推导出的理论行程，不能替代
+本机实测标定值。正确推导见
 [design-notes.zh-CN.md](design-notes.zh-CN.md#行程限位的推导)。
 
 ---
@@ -206,3 +211,13 @@ ros2 run tf2_ros tf2_echo base_footprint base_link
 若 `/robot_description` 为空，说明 `robot_state_publisher` 未启动或展开 xacro 失败 ——
 请检查其终端输出。若 `/robot_description` 正常但变换缺失，见
 [`gui:=false` 会使手指 link 从 TF 中消失](#guifalse-会使手指-link-从-tf-中消失)。
+
+本机当前标定记录为：`zero_position_rad = 0.041390`、
+`max_position_rad = -1.272793`、`travel_range_rad = 1.314183`、
+`rad_to_mm = 65.0229 mm/rad`；`calibrate_guided` 3 次输出稳定，张开端复测 5 次
+得到的机械行程为 `85.43–85.47 mm`。位置卡尺数据已经采集，但 `20 mm` 位置出现
+`18.80 mm` 的异常读数，最大原始绝对误差为 `1.20 mm`，因此位置绝对误差仍需复测
+后才能最终验收。50 次循环（`2 mm ↔ 83 mm`）已完成，第 1 次到第 50 次的闭合端、
+张开端开口漂移分别为 `+0.01 mm`、`+0.02 mm`，闭合角度和张开角度漂移均为
+`+0.000009 rad`。上述实测数据不等同于 `calibrate_guided` 源代码逻辑和运行时
+Gazebo/TF 验证已经完成；这两项仍需单独验证。
