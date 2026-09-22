@@ -9,9 +9,10 @@ parameters.
 > **Read this first.** The SDK's calibration routine does **not** measure the gripper's
 > stroke. It measures the motor's *angular* range and then derives the mm scale by
 > **dividing an assumed stroke by that range**. As shipped, that assumed stroke is
-> **120 mm**; the actual mechanical stroke of this gripper is **87 mm**. Until you correct
-> it, every millimetre reading the SDK reports is **1.38× too large**. Step 2 exists solely
-> to fix this, and it is not optional.
+> **120 mm**; the caliper-measured mechanical stroke of this gripper is **85.452 mm**
+> (the original design expectation was 87 mm). Until you correct it, every millimetre
+> reading the SDK reports is about **1.40× too large**. Step 2 exists solely to fix this,
+> and it is not optional.
 
 ---
 
@@ -43,23 +44,23 @@ number.
 
 | Representation | Fully closed | Fully open | Direction |
 | --- | --- | --- | --- |
-| **Motor position** (rad) | ≈ `+0.114` | ≈ `-1.491` | **Decreases** as the gripper opens |
-| **SDK position** (mm) | `0` | `max_stroke_mm` (= 87) | Increases as the gripper opens |
-| **URDF joint** `q` (m) | `0.0435` | `0.0` | **Decreases** as the gripper opens |
+| **Motor position** (rad) | `+0.041390` (measured on this unit) | `-1.272793` (measured on this unit) | **Decreases** as the gripper opens |
+| **SDK position** (mm) | `0` | `max_stroke_mm` (= 85.452) | Increases as the gripper opens |
+| **URDF joint** `q` (m) | `0.042726` | `0.0` | **Decreases** as the gripper opens |
 
-The rad values above are from the shipped factory calibration and must be re-measured in
-Step 3.
+The rad values above come from this unit's endpoint calibration; they must be re-measured
+after changing a motor, adjusting the mechanism, or a coupling slip.
 
 **Conversions.** Let `p` be SDK position (mm), `q` the URDF joint value (m), `r` the motor
 position (rad), `r_closed` the closed-limit rad value, and `k` = `rad_to_mm`.
 
 ```text
 p = (r_closed - r) * k                    r = r_closed - p / k
-q = 0.0435 * (1 - p / 87.0)               p = 87.0 * (1 - q / 0.0435)
+q = 0.042726 * (1 - p / 85.452)           p = 85.452 * (1 - q / 0.042726)
 ```
 
-Check the bridge against the geometry: `p = 0` (closed) gives `q = 0.0435` ✓; `p = 87`
-(open) gives `q = 0` ✓.
+Check the bridge against the geometry: `p = 0` (closed) gives `q = 0.042726` ✓;
+`p = 85.452` (open) gives `q = 0` ✓.
 
 ---
 
@@ -113,9 +114,10 @@ The stroke is the one quantity the SDK cannot discover. Measure it directly.
    self-lock.
 2. **Close the jaws fully by hand** and hold them against the closed hard stop.
 3. **Measure between the two inner faces** with the digital caliper at the finger tips.
-   This is the zero reference — record it as `O_closed`. It should read **0.00 mm** for a
-   correctly modelled gripper. A non-zero value means the jaws are not fully seated, or the
-   hard stop is contaminated.
+   This is the zero reference — record it as `O_closed`. On this unit the 5-reading mean is
+   **1.508 mm**, i.e. a small residual gap remains at the closed hard stop. If a later
+   value shifts noticeably, check that the jaws are fully seated, that the hard stop has not
+   loosened, and that nothing is trapped between the fingers.
 4. **Open the jaws fully by hand** against the open hard stop and measure again between the
    same two faces. Record as `O_open`.
 5. **Compute the stroke:** `stroke = O_open − O_closed`.
@@ -123,30 +125,39 @@ The stroke is the one quantity the SDK cannot discover. Measure it directly.
    stroke and the spread as your measurement uncertainty. A spread above ~0.3 mm indicates a
    loose mechanism or an inconsistent hand force — investigate before continuing.
 
-Expected result for LiteGrip:
+Measured result for this LiteGrip unit:
 
-| Quantity | Expected |
+| Quantity | Measured |
 | --- | --- |
-| `O_open` (fully open, inner face to inner face) | **87.0 mm** |
-| Per-finger travel | **43.5 mm** (= stroke / 2) |
+| `O_closed` (fully closed, inner face to inner face) | **1.508 mm** (mean of 5) |
+| `O_open` (fully open, inner face to inner face) | **86.960 mm** (mean of 5) |
+| Total opening-change stroke | **85.452 mm** (original design expectation 87.0 mm) |
+| Per-finger travel | **42.726 mm** (= stroke / 2, assuming symmetric finger motion) |
 
-The per-finger figure is what the URDF's `stroke` parameter holds (as `0.0435` m), because
-the model has one prismatic joint per finger. The 87 mm figure is what the SDK's
-`max_stroke_mm` holds, because SDK position spans the whole opening.
+On the first measurement pass the closed-end readings spanned 0.10 mm and the open-end
+readings spanned 1.40 mm. Five open-end rechecks were then taken with a consistent
+measurement position, pose, and seating force: closed opening mean `1.504 mm`, open opening
+mean `86.956 mm`, mechanical stroke mean `85.452 mm`, open-end spread `0.06 mm`. The rechecks
+were stable, and the final value adopted is `rad_to_mm = 65.0229 mm/rad`.
 
-> If you measure something other than 87 mm, **stop**. Every constant in both the SDK and
-> the URDF is derived from this number, and the geometric derivation in
-> [design-notes.md](design-notes.md#deriving-the-travel-limit) is built on the mesh
-> bounding box. A materially different measurement means the model and the hardware are
-> different units; resolve that before calibrating either.
+The per-finger figure is what the URDF's `stroke` parameter holds (written as `0.042726` m
+this time), because the model has one prismatic joint per finger. The 85.452 mm figure is
+what the SDK's `max_stroke_mm` holds, because SDK position spans the whole opening.
+
+> The measured stroke, 85.452 mm, is 1.548 mm (about 1.78%) smaller than the original design
+> expectation of 87.0 mm. The stroke-related constants in both the SDK and the URDF must be
+> updated to this measured value; also re-check the mesh-bounding-box derivation in
+> [design-notes.md](design-notes.md#deriving-the-travel-limit) to confirm that the physical
+> closed clearance, the mechanical hard stops, and the model's zero point are defined
+> consistently.
 
 Record:
 
 ```text
-O_closed  = ______ mm     (5 readings: ____ ____ ____ ____ ____)
-O_open    = ______ mm     (5 readings: ____ ____ ____ ____ ____)
-stroke    = O_open - O_closed = ______ mm        expected 87.0
-per-finger travel = stroke / 2 = ______ mm       expected 43.5
+O_closed  = 1.508 mm      (5 readings: 1.52 1.48 1.46 1.56 1.52)
+O_open    = 86.960 mm     (5 readings: 87.6 87.2 87.0 86.2 86.8)
+stroke    = O_open - O_closed = 85.452 mm         original design expectation 87.0
+per-finger travel = stroke / 2 = 42.726 mm        original design expectation 43.5
 ```
 
 ---
@@ -154,7 +165,7 @@ per-finger travel = stroke / 2 = ______ mm       expected 43.5
 ## Step 2 — Correct the SDK's assumed stroke
 
 The SDK derives its mm scale from an assumed stroke. That assumption is wrong and must be
-fixed **before** any calibration run, otherwise you will bake a 1.38× scale error into the
+fixed **before** any calibration run, otherwise you will bake a ~1.40× scale error into the
 saved calibration file.
 
 There are two places to fix.
@@ -164,7 +175,7 @@ There are two places to fix.
 
 ```python
 # litegrip/models.py, GripperConfig
-max_stroke_mm: float = 87.0     # was 120.0
+max_stroke_mm: float = 85.452   # measured on this unit; was 120.0
 ```
 
 **2b. The hardcoded value in `calibrate_guided()`** — this method ignores the config
@@ -186,11 +197,10 @@ Any remaining `120.0` in a position or conversion context is a defect. Cosmetic 
 in printed labels (for example `张开(120mm)`) and in docstrings should be corrected too, but
 they do not affect behaviour — do not confuse the two when checking.
 
-> **Why this matters.** `rad_to_mm = max_stroke_mm / travel_range`. With the assumed 120 mm
-> and the measured 1.605 rad range, the shipped factory calibration records
-> `rad_to_mm = 74.8`. With the true 87 mm the correct value is `87.0 / 1.605 = 54.21`.
-> Every `goto(60.0)` under the wrong scale moves the gripper to a real opening of 43.5 mm,
-> and `move_at_speed(speed_mm_s=40.0)` actually moves at 29 mm/s.
+> **Why this matters.** `rad_to_mm = max_stroke_mm / travel_range`. With the wrong assumed
+> 120 mm and this unit's measured 1.314183 rad range, you get `rad_to_mm ≈ 91.311`. With the
+> true 85.452 mm stroke the correct value is `85.452 / 1.314183 = 65.0229`. The two differ by
+> about 1.40×, so the mm scale must be recomputed from the measured stroke.
 
 ### Which APIs this does and does not affect
 
@@ -198,11 +208,11 @@ they do not affect behaviour — do not confuse the two when checking.
 a wrong scale does **not** make the gripper collide with anything — it makes every
 millimetre-denominated number wrong.
 
-| API | Uses `rad_to_mm`? | Effect of a 1.38× too-large scale |
+| API | Uses `rad_to_mm`? | Effect if you still compute with the 120 mm assumption |
 | --- | --- | --- |
-| `get_state().position_mm`, `get_position()` | Yes | Reads 1.38× too large — a real 43.5 mm opening reports as 60 mm |
-| `goto(position_mm)` | Yes | Target lands short: `goto(60)` reaches 43.5 mm |
-| `move_at_speed(target_mm, speed_mm_s)` | Yes | Both target and speed scale down by 1.38× |
+| `get_state().position_mm`, `get_position()` | Yes | Reads about 1.40× too large |
+| `goto(position_mm)` | Yes | The target lands short of the requested opening |
+| `move_at_speed(target_mm, speed_mm_s)` | Yes | Both target and speed scale down by the wrong ratio |
 | `open()`, `close()`, `goto_rad()`, `move_to()` | **No** — these command radians | Unaffected; they still reach the true limits |
 | `close(force_n=...)`, `set_force()` | **No** — torque domain | Unaffected by this constant; see Step 6 for force |
 | `grasp()` | **No** — stall detection on radians | Unaffected |
@@ -258,25 +268,27 @@ python examples/calibrate_manual.py --channel can0 --mst-id 0x18 --mode guided -
 Each method prints and returns a `CalibrationData`:
 
 ```text
-闭合极限:   +0.114xxx rad  (0.0 mm)
-张开极限:   -1.491xxx rad  (87.0 mm)
-行程:        1.605xxx rad
-转换系数:   54.2 mm/rad
+闭合极限:   +0.041390 rad  (0.0 mm travel position; actual closed clearance 1.508 mm)
+张开极限:   -1.272793 rad  (85.452 mm travel position; actual opening 86.960 mm)
+行程:        1.314183 rad
+转换系数:   65.0229 mm/rad
 ```
 
 Sanity checks before accepting:
 
 | Check | Expected |
 | --- | --- |
-| `travel_range` | ≈ 1.6 rad, positive |
-| Closed rad value | Positive, near `+0.11` |
-| Open rad value | Negative, near `-1.49` |
+| `travel_range` | This unit measures `1.314183 rad`, and positive |
+| Closed rad value | This unit measures `+0.041390 rad` |
+| Open rad value | This unit measures `-1.272793 rad` |
 | Open rad **less than** closed rad | Must hold — the sign convention is inverted relative to mm |
-| Spread across 3 runs | Within ~0.01 rad. A larger spread means the stop detection is inconsistent. |
+| Spread across 3 runs | **Re-measured; values are stable** |
 
-Run the calibration **three times** and compare `travel_range`. They should agree closely;
-the mechanism is rigid, so a large run-to-run variation points at a detection problem
-rather than real mechanical variation.
+Repeat measurement has been completed on this unit: `zero_position_rad = 0.041390`,
+`max_position_rad = -1.272793`, and `travel_range_rad = 1.314183` are stable, and the angle
+endpoint repeatability check passed. Three consecutive `calibrate_guided` runs gave angular
+ranges of `1.314180 / 1.314170 / 1.314190 rad`, corresponding to `rad_to_mm` values of
+`65.0231 / 65.0236 / 65.0226 mm/rad` — the software calibration result is stable.
 
 ---
 
@@ -286,8 +298,8 @@ If Steps 2 and 3 are done, the value is already correct:
 
 ```text
 rad_to_mm = stroke_mm / travel_range_rad
-          = 87.0 / 1.605
-          = 54.21 mm/rad
+          = 85.452 / 1.314183
+          = 65.0229 mm/rad
 ```
 
 **If you are patching an existing calibration file instead of re-running**, edit
@@ -297,10 +309,10 @@ from the file, so this is the value that actually governs behaviour at runtime �
 
 ```json
 {
-  "zero_position_rad": 0.114,
-  "max_position_rad": -1.491,
-  "travel_range_rad": 1.605,
-  "rad_to_mm": 54.21
+  "zero_position_rad": 0.04139,
+  "max_position_rad": -1.272793,
+  "travel_range_rad": 1.314183,
+  "rad_to_mm": 65.0229
 }
 ```
 
@@ -315,8 +327,8 @@ the last is correct:
 | Source | Value | Basis |
 | --- | --- | --- |
 | `UnitConversion.RAD_TO_MM` in `constants.py` | 105.26 | `120 / 1.14` — assumes a 1.14 rad range that was never measured |
-| `factory_calibration.json`, `rad_to_mm` | 74.8 | `120 / 1.605` — correct range, **wrong stroke** |
-| Correct value for this gripper | **54.21** | `87.0 / 1.605` — measured stroke, measured range |
+| `factory_calibration.json`, `rad_to_mm` | 74.8 | An old factory sample value; not applicable to this unit's calibration |
+| Measured value for this gripper | **65.0229** | `85.452 / 1.314183` — measured stroke and measured range |
 
 The 1.14 rad figure in `constants.py` matches neither the measured range nor the factory
 file, and `UnitConversion.RAD_TO_MM` is not what `get_state()` uses at runtime. Treat it as
@@ -329,18 +341,24 @@ stale; do not use it as a reference.
 Do not trust a calibration you have not measured against a caliper.
 
 1. With the calibration loaded, command a series of positions and let each settle:
-   `gripper.goto(p)` for `p` = 0, 20, 40, 60, 80, 87.
+   `gripper.goto(p)` for `p` = 0, 20, 40, 60, 80, 85.452.
 2. At each, measure the opening between the inner faces with the caliper.
 3. Tabulate the error.
 
-| Commanded (mm) | `get_state().position_mm` | Caliper (mm) | Error (mm) |
+| Commanded (mm) | Expected caliper opening | Measured caliper (mm) | Error (mm) |
 | --- | --- | --- | --- |
-| 0 | ____ | ____ | ____ |
-| 20 | ____ | ____ | ____ |
-| 40 | ____ | ____ | ____ |
-| 60 | ____ | ____ | ____ |
-| 80 | ____ | ____ | ____ |
-| 87 | ____ | ____ | ____ |
+| 0 mm | 1.508 mm | 0.12, 0.04, 0.16, 0.06, 0.12 (mean 0.100) | -1.388, -1.468, -1.348, -1.448, -1.388 (mean -1.408) |
+| 20 mm | 21.508 mm | 20.40, 20.04, 20.08, 19.98, 18.80 (mean 19.860) | -1.108, -1.468, -1.428, -1.528, -2.708 (mean -1.648) |
+| 40 mm | 41.508 mm | 40.02, 40.20, 40.22, 39.86, 39.90 (mean 40.040) | -1.488, -1.308, -1.288, -1.648, -1.608 (mean -1.468) |
+| 60 mm | 61.508 mm | 60.22, 59.86, 60.02, 60.06, 59.98 (mean 60.028) | -1.288, -1.648, -1.488, -1.448, -1.528 (mean -1.480) |
+| 80 mm | 81.508 mm | 80.06, 80.10, 79.88, 80.02, 79.96 (mean 80.004) | -1.448, -1.408, -1.628, -1.488, -1.548 (mean -1.504) |
+| 85.452 mm | 86.960 mm | 85.24, 85.52, 85.60, 85.40, 85.80 (mean 85.512) | -1.720, -1.440, -1.360, -1.560, -1.160 (mean -1.448) |
+
+The second column is the theoretical expectation computed as `actual closed clearance
+1.508 mm + SDK commanded travel`; columns three and four are this run's caliper readings and
+the per-reading error against the absolute jaw opening. The current maximum absolute error
+is **2.708 mm**, which does not yet meet the **< 0.5 mm** acceptance requirement. All six test
+positions have five caliper readings each.
 
 Acceptance: maximum absolute error below **0.5 mm**, with no systematic trend. The SDK's
 specified repeatability is ±0.03 mm, but that is the motor's positioning repeatability, not
@@ -348,7 +366,7 @@ the calibration's absolute accuracy — do not hold the absolute figure to that 
 
 **A constant offset** across all rows means `zero_position_rad` is off — the closed hard
 stop was detected at the wrong point. **A proportional error** (small near 0, growing toward
-87) means `rad_to_mm` is wrong — most likely the stroke assumption crept back in. Recheck
+85.452) means `rad_to_mm` is wrong — most likely the stroke assumption crept back in. Recheck
 Step 2.
 
 ---
@@ -493,7 +511,7 @@ placeholders chosen to damp simulation oscillation. They were not measured.
 
 | xacro argument | Source | How to obtain |
 | --- | --- | --- |
-| `stroke` | Step 1 | `stroke_mm / 2 / 1000` → `0.0435` m |
+| `stroke` | Step 1 | `85.452 / 2 / 1000` → `0.042726` m |
 | `effort` | Step 6 | Maximum grip force at the permitted torque, in N |
 | `velocity` | Step 7 | `(max opening rate mm/s) / 2 / 1000` |
 | `joint_damping` | Step 8 | Fitted slope, N·s/m (**simulation only**) |
@@ -502,7 +520,7 @@ placeholders chosen to damp simulation oscillation. They were not measured.
 Edit the defaults in [`urdf/litegrip_urdf.urdf.xacro`](../urdf/litegrip_urdf.urdf.xacro):
 
 ```xml
-<xacro:arg name="stroke"         default="0.0435"/>
+<xacro:arg name="stroke"         default="0.042726"/> <!-- measured travel on this unit, converted -->
 <xacro:arg name="effort"         default="__._"/>    <!-- Step 6 -->
 <xacro:arg name="velocity"       default="0.____"/>  <!-- Step 7 -->
 <xacro:arg name="joint_damping"  default="0.____"/>  <!-- Step 8, sim only -->
@@ -540,30 +558,60 @@ Date:                        ______________________
 Operator:                    ______________________
 
 MEASURED
-  stroke (inner face to inner face)     ______ mm      (5 readings: ____ ____ ____ ____ ____)
-  per-finger travel                     ______ mm
-  travel_range_rad (3 runs)             ______ / ______ / ______ rad
-  rad_to_mm  = stroke / travel_range    ______ mm/rad
-  NM_TO_N (k), fitted                   ______ N/Nm
-  max opening rate                      ______ mm/s
-  max grip force @ permitted torque     ______ N
-  breakaway force (median, sim only)    ______ N
-  damping slope (sim only)              ______ N·s/m
+  closed opening (inner face to inner face)  1.508 mm   (5 readings: 1.52 1.48 1.46 1.56 1.52)
+  max opening (inner face to inner face)     86.960 mm  (5 readings: 87.6 87.2 87.0 86.2 86.8)
+  total opening-change stroke                85.452 mm
+  per-finger travel                          42.726 mm
+  zero_position_rad                          0.041390 rad
+  max_position_rad                          -1.272793 rad
+  travel_range_rad                           1.314183 rad (re-measured; stable)
+  angular endpoint repeatability             completed; stable
+  rad_to_mm = stroke / travel_range          65.0229 mm/rad (5 open-end rechecks: closed
+                                             1.50/1.52/1.49/1.51/1.50 mm; open
+                                             86.94/86.99/86.95/86.97/86.93 mm; per-run
+                                             65.0139/65.0372/65.0286/65.0291/65.0053;
+                                             spread 0.06 mm)
+  position absolute error                    current max absolute error 2.708 mm (fails the
+                                             < 0.5 mm acceptance; five readings taken at each
+                                             of the six positions)
+  pressure / torque calibration test         pending
+  NM_TO_N (k), fitted                        pending
+  N_TO_NM (1/k), conversion                  pending
+  max opening rate                           pending
+  max grip force @ permitted torque          pending
+  URDF effort                                pending
+  URDF velocity                              pending
+  breakaway force / joint_friction (sim only)  pending
+  damping slope / joint_damping (sim only)     pending
 
 WRITTEN TO
-  ~/.litegrip/litegrip_calibration.json   rad_to_mm = ______
-  litegrip/models.py                      max_stroke_mm = ______
-  litegrip/gripper.py                     calibrate_guided fixed: yes / no
-  urdf/litegrip_urdf.urdf.xacro           stroke/effort/velocity/damping/friction = ______
+  ~/.litegrip/litegrip_calibration.json   rad_to_mm = 65.0229
+  litegrip/models.py                      max_stroke_mm = 85.452
+  litegrip/gripper.py                     calibrate_guided fixed and verified: closed angle
+                                          0.041390/0.041380/0.041400 rad; open angle
+                                          -1.272790/-1.272790/-1.272790 rad; angular range
+                                          1.314180/1.314170/1.314190 rad; rad_to_mm
+                                          65.0231/65.0236/65.0226 mm/rad
+  urdf/litegrip_urdf.urdf.xacro           stroke = 0.042726; effort/velocity/damping/friction = pending
 
 VERIFICATION
-  max position error over 0..87 mm      ______ mm     (accept < 0.5 mm, no trend)
+  max position error over 0..85.452 mm   2.708 mm (current measurement; fails the < 0.5 mm acceptance)
   object held at force_n = ______ N, mass = ______ kg
+  50-cycle repeatability                 completed: 2↔83 mm; nodes 1/10/20/30/40/50; closed
+                                         opening 3.51/3.50/3.52/3.51/3.52/3.52 mm; open
+                                         opening 84.51/84.52/84.50/84.51/84.53/84.53 mm;
+                                         closed angle 0.010632/0.010626/0.010639/0.010631/
+                                         0.010640/0.010641 rad; open angle -1.235083/-1.235090/
+                                         -1.235076/-1.235087/-1.235078/-1.235074 rad; max
+                                         absolute drift 0.02 mm (quantitatively passed)
 ```
 
-**Repeatability check.** Run 50 open/close cycles with `examples/cycle_test.py`, then repeat
-the Step 5 table. The error must not drift. Drift indicates mechanical wear, a slipping
-coupling, or a hard stop that has moved — all of which invalidate the calibration.
+**Repeatability check (current status: completed, quantitatively passed).** Fifty open/close
+cycles have been run over `2 ↔ 83 mm`. Comparing cycle 1 with cycle 50, the closed opening went
+from `3.51 mm` to `3.52 mm`, a drift of `+0.01 mm`; the open opening went from `84.51 mm` to
+`84.53 mm`, a drift of `+0.02 mm`; the largest absolute drift among the recorded nodes was
+`0.02 mm`, with no significant mechanical drift observed. If noticeable drift appears later,
+check for mechanical wear, a slipping coupling, or a hard stop that has moved.
 
 **Re-calibrate when** the mechanism is disassembled, a hard stop is adjusted, the coupling
 between the motor and the mechanism slips, the motor or its driver is replaced, or the
@@ -595,10 +643,10 @@ fixed by calibrating.
 
 | # | Location | Issue | Effect |
 | --- | --- | --- | --- |
-| 1 | `models.py`, `GripperConfig.max_stroke_mm` | `120.0`, but the true stroke is 87 mm | All mm readings 1.38× too large once baked into `rad_to_mm` |
+| 1 | `models.py`, `GripperConfig.max_stroke_mm` | Shipped as `120.0`, while this unit measures an 85.452 mm stroke | If you still compute with 120 mm, every mm reading is about 1.40× too large |
 | 2 | `gripper.py`, `calibrate_guided()` | Hardcodes `120.0 / travel`, ignoring the config | Fixing the config alone does not fix this method |
-| 3 | `gripper.py`, `home()` | Moves to the literal `POS_CLOSED_RAD = 0.0`, not `config.pos_closed_rad` | After calibration (closed ≈ `+0.114`), `home()` stops ~6 mm *open* rather than closing |
-| 4 | `constants.py`, `POS_OPEN_RAD = 1.14` | Sign and magnitude disagree with the measured open limit (`≈ -1.491`) | Currently unused — dead constant, but misleading |
+| 3 | `gripper.py`, `home()` | Moves to the literal `POS_CLOSED_RAD = 0.0`, not `config.pos_closed_rad` | This unit's closed angle is `+0.041390`; moving to 0 rad stops ~2.69 mm of travel short of closed |
+| 4 | `constants.py`, `POS_OPEN_RAD = 1.14` | Sign and magnitude disagree with this unit's measured open limit (`-1.272793`) | Currently unused — dead constant, but misleading |
 | 5 | `constants.py`, `UnitConversion.RAD_TO_MM = 105.26` | Assumes a 1.14 rad range that was never measured | Not used at runtime; three different mm/rad values circulate in the codebase |
 | 6 | `models.py`, `GripperState.aperture_mm` | Docstring says "single-side displacement; for total jaw separation multiply by 2" | Contradicts `move_at_speed`'s "0=closed, 120=open" and the calibration math. The math treats `max_stroke_mm` as the **whole** opening; the docstring is wrong |
 | 7 | `constants.py`, `UnitConversion.NM_TO_N = 10.0` | Unverified nominal | Grip force commands are approximate until Step 6 |

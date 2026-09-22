@@ -47,9 +47,17 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
   test over `2 mm ↔ 83 mm`, the closed/open opening drift was `+0.01` / `+0.02 mm`, and
   both endpoint angle drifts were `+0.000009 rad`.
 - Updated the xacro and launch defaults from the old nominal `0.0435 m` to the measured
-  `0.042726 m` per-finger stroke. Force, speed, damping, friction, hardware integration,
-  the `calibrate_guided` source logic, and runtime Gazebo/TF validation remain uncalibrated
-  or unverified.
+  `0.042726 m` per-finger stroke. `0.0435 m` remains documented as the mesh-theoretical
+  closure only. Because the limit change moves both travel endpoints of the model, the
+  previously recorded TF/mesh geometry check no longer covers the shipped configuration and
+  is tracked as re-verification pending in the README status table. Force, speed, damping,
+  friction, hardware integration, the `calibrate_guided` source logic, and runtime
+  Gazebo/TF validation remain uncalibrated or unverified.
+- Synchronized the English documentation set with the measured calibration. The measured
+  values (`85.452 mm`, `86.960 mm`, `1.508 mm`, `0.042726 m`, `65.0229 mm/rad`, `~1.40×`)
+  previously existed only in the Chinese documents and the changelog; `README.md`,
+  `docs/calibration-guide.md`, `docs/design-notes.md`, and `docs/troubleshooting.md` now
+  carry them too, so the two language sets state the same numbers.
 - `README.md` is now written in English as the repository default; the previous Chinese
   content was revised and moved to `README.zh-CN.md`. Both versions cross-link.
 

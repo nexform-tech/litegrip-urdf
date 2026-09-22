@@ -69,7 +69,7 @@ All three frames then resolve.
 
 ```bash
 ros2 topic pub --once /gripper_controller/commands \
-  std_msgs/msg/Float64MultiArray "{data: [0.05, 0.05]}"   # stroke is 0.0435
+  std_msgs/msg/Float64MultiArray "{data: [0.05, 0.05]}"   # stroke is 0.042726
 ros2 topic echo --once /joint_states
 # position:
 # - 0.05
@@ -169,7 +169,10 @@ the model never spawns.
 
 **Cause.** Gazebo Classic is optional and is not installed by default. **It was not
 installed in the environment where this package was verified, so `gazebo.launch.py` has
-never been executed and must be treated as untested.**
+never been executed and must be treated as untested.** So although the mechanical stroke
+and angular range of this unit have been calibrated, the mesh, TF, and controller
+behaviour of the updated `0.042726 m` travel limit inside Gazebo cannot be treated as
+verified either.
 
 **Fix.** Install the simulation dependencies:
 
@@ -198,8 +201,10 @@ motion in the simulation.
 
 **Fix.** Use `urdf/litegrip_urdf.urdf.xacro` from this package. Neither intermediate file
 is usable as a reference — in particular, **do not copy the `0.067` travel limit from
-them**; see [design-notes.md](design-notes.md#deriving-the-travel-limit) for the correct
-derivation.
+them**. The measured per-finger travel of this unit is `0.042726 m`, with a total
+mechanical stroke of `85.452 mm`; `0.0435 m` is only the theoretical travel derived from
+the mesh bounding box and is not a substitute for the measured calibration value. See
+[design-notes.md](design-notes.md#deriving-the-travel-limit) for the correct derivation.
 
 ---
 
@@ -222,3 +227,15 @@ If `/robot_description` is empty, `robot_state_publisher` did not start or faile
 expand the xacro — check its console output. If the transform is missing while
 `/robot_description` is present, see
 [`gui:=false` removes the finger links from TF](#guifalse-removes-the-finger-links-from-tf).
+
+The current calibration record for this unit is `zero_position_rad = 0.041390`,
+`max_position_rad = -1.272793`, `travel_range_rad = 1.314183`, and
+`rad_to_mm = 65.0229 mm/rad`; three `calibrate_guided` runs were stable, and five
+open-end rechecks gave a mechanical stroke of `85.43–85.47 mm`. Caliper position data has
+been collected, but the `20 mm` position contains an `18.80 mm` reading with a maximum raw
+absolute error of `1.20 mm`, so position accuracy still needs a re-test before final
+acceptance. Fifty cycles over `2 mm ↔ 83 mm` were completed: the closed-end and open-end
+opening drift from cycle 1 to cycle 50 were `+0.01 mm` and `+0.02 mm`, and both closed and
+open angle drifts were `+0.000009 rad`. None of this measured data means that the
+`calibrate_guided` source logic or the runtime Gazebo/TF validation is complete; those two
+items still need to be verified separately.

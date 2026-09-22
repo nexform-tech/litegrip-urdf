@@ -42,7 +42,7 @@ def generate_launch_description():
     )
 
     declared_arguments = [
-        DeclareLaunchArgument('stroke', default_value='0.0435',
+        DeclareLaunchArgument('stroke', default_value='0.042726',
                               description='单指行程 (m)'),
         DeclareLaunchArgument('effort', default_value='10.0',
                               description='关节最大输出力 (N)'),

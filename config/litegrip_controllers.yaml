@@ -34,8 +34,10 @@ gripper_controller:
     #   数组顺序即指令顺序：
     #     [0] gripper_slide_joint_right
     #     [1] gripper_slide_joint_left
-    #   0.0     -> 最大张开（两指内侧面 x = ±0.0435，开口 87 mm）
-    #   0.0435  -> 完全闭合（两指内侧面在 x = 0 贴合）
+    #   0.0       -> 最大张开（两指内侧面理论 x = ±0.0435，模型开口 87 mm）
+    #   0.042726  -> 实测闭合标定位置（本机实测闭合间隙 1.508 mm）
+    #   ⚠ 关节 limit 的 upper 现取实测单指行程 0.042726，
+    #     mesh 理论闭合行程 0.0435 仅作几何参照。
     joints:
       - gripper_slide_joint_right
       - gripper_slide_joint_left

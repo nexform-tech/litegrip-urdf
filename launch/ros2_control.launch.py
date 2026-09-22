@@ -47,7 +47,7 @@ def generate_launch_description():
             'hardware_plugin', default_value='mock_components/GenericSystem',
             description='ros2_control 硬件接口插件；接入真机时替换为厂商插件'),
         DeclareLaunchArgument(
-            'stroke', default_value='0.0435',
+            'stroke', default_value='0.042726',
             description='单指行程 (m)'),
         DeclareLaunchArgument(
             'effort', default_value='10.0',

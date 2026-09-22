@@ -25,7 +25,7 @@ not — read it before depending on any part of this package.
 | `colcon build` | ✅ Verified | Builds on ROS 2 Humble; see [known environment issue](docs/troubleshooting.md#conda-python3-breaks-the-build) |
 | `display.launch.py` | ✅ Verified | Launches, `stroke:=` override propagates into the URDF |
 | `ros2_control.launch.py` | ✅ Verified | Both controllers reach `active`; position command round-trip confirmed |
-| Joint geometry (stroke ↔ opening) | ✅ Verified | Finger origins and inner-face positions confirmed via TF at both travel limits |
+| Joint geometry (stroke ↔ opening) | ⚠️ **Re-verification pending** | Finger origins and inner-face positions were confirmed via TF at the mesh-theoretical travel limit `0.0435`; the shipped limit is now the measured `0.042726`, so both endpoints need re-checking |
 | `gazebo.launch.py` | ⚠️ **Not verified** | Gazebo is not installed in the verification environment; never executed |
 | Parameters `effort`, `velocity` | ⚠️ **Placeholder** | SolidWorks export defaults, not measured. See [Calibration required](#calibration-required) |
 | Parameters `joint_damping`, `joint_friction` | ⚠️ **Placeholder** | Conservative values chosen to damp simulation oscillation |
@@ -135,7 +135,7 @@ Drag the sliders in the `joint_state_publisher_gui` window to drive both fingers
 | `gui` | `true` | Start `joint_state_publisher_gui` (joint sliders) |
 | `rviz` | `true` | Start RViz2 |
 | `rvizconfig` | `config/litegrip_urdf.rviz` | RViz configuration file path |
-| `stroke` | `0.0435` | Per-finger travel (m) |
+| `stroke` | `0.042726` | Per-finger travel (m) — measured value |
 | `effort` | `10.0` | Joint maximum effort (N) |
 | `velocity` | `0.2` | Joint maximum velocity (m/s) |
 
@@ -167,7 +167,7 @@ ros2 launch litegrip_urdf ros2_control.launch.py
 | Argument | Default | Description |
 | --- | --- | --- |
 | `hardware_plugin` | `mock_components/GenericSystem` | ros2_control hardware interface plugin |
-| `stroke` | `0.0435` | Per-finger travel (m) |
+| `stroke` | `0.042726` | Per-finger travel (m) — measured value |
 | `effort` | `10.0` | Joint maximum effort (N) |
 | `velocity` | `0.2` | Joint maximum velocity (m/s) |
 
@@ -197,13 +197,13 @@ ros2 control list_hardware_interfaces
 
 # Command the gripper (order: right finger, left finger)
 ros2 topic pub --once /gripper_controller/commands \
-  std_msgs/msg/Float64MultiArray "{data: [0.0435, 0.0435]}"
+  std_msgs/msg/Float64MultiArray "{data: [0.042726, 0.042726]}"
 
 ros2 topic echo /joint_states
 ```
 
 > ⚠️ **The mock hardware does not clamp out-of-range commands.** In the configuration
-> above, `[0.05, 0.05]` exceeds `stroke = 0.0435` and is echoed back as `0.05` without
+> above, `[0.05, 0.05]` exceeds `stroke = 0.042726` and is echoed back as `0.05` without
 > error or clamping, despite the `min`/`max` parameters declared on the command
 > interface. The travel limits are descriptive metadata in this configuration, not an
 > enforced constraint. Clamp commands in your own application layer.
@@ -232,8 +232,8 @@ spawns the model, then activates `joint_state_broadcaster` followed by `gripper_
 
 | Joint | Type | Axis | Origin in `base_link` | Limit |
 | --- | --- | --- | --- | --- |
-| `gripper_slide_joint_right` | prismatic | `+X` | `(-0.067, 0.0010833, 0.034083)` | `[0, 0.0435]` m |
-| `gripper_slide_joint_left` | prismatic | `-X` | `( 0.067, -0.0010833, 0.034083)` | `[0, 0.0435]` m |
+| `gripper_slide_joint_right` | prismatic | `+X` | `(-0.067, 0.0010833, 0.034083)` | `[0, 0.042726]` m |
+| `gripper_slide_joint_left` | prismatic | `-X` | `( 0.067, -0.0010833, 0.034083)` | `[0, 0.042726]` m |
 
 ### Links
 
@@ -279,19 +279,22 @@ Therefore both joints take the *same sign* to move the fingers symmetrically.**
 
 | Command | Result |
 | --- | --- |
-| `[0.0, 0.0]` | Fully open — inner faces at `x = ∓0.0435`, opening **87 mm** |
+| `[0.0, 0.0]` | Fully open — model inner faces at `x = ∓0.0435`, model opening **87 mm**; this gripper calipers at **86.960 mm** |
 | `[0.02, 0.02]` | Partially closed |
-| `[0.0435, 0.0435]` | Fully closed — inner faces meet at `x = 0`, zero gap |
+| `[0.042726, 0.042726]` | Measured closed calibration position — this gripper calipers at a **1.508 mm** gap |
 
 **Writing a controller on the intuition that the two values should have opposite signs
 will drive the fingers in opposite directions instead of together.** This has been
 confirmed by direct measurement: at `[0, 0]` the finger origins sit at `x = ∓0.067`
-(inner faces at `∓0.0435`), and at `[0.0435, 0.0435]` they sit at `x = ∓0.0235`
-(inner faces at `x = 0`).
+(model inner faces at `∓0.0435`), and at the mesh-theoretical closure `0.0435` they would
+sit at `x = ∓0.0235` (inner faces at `x = 0`, zero gap). The shipped limit `0.042726`
+stops just short of that, at the measured closed position.
 
-### Why the travel limit is 0.0435 and not 0.067
+### Why the travel limit is 0.042726 and not 0.067
 
-Derived from mesh geometry — **do not revert this to the SolidWorks export value**:
+Two different numbers are in play here. Do not conflate them.
+
+**Mesh-theoretical closure `0.0435`** is derived from the CAD geometry:
 
 ```text
 gripper_slider_link1.STL X range = [-0.00095, +0.0235]   (bounding box, measured)
@@ -299,10 +302,24 @@ joint origin x                   = -0.067
 => stroke = 0.067 - 0.0235       =  0.0435
 ```
 
+That is the joint value at which the two inner faces would meet exactly at `x = 0`, i.e.
+zero gap. It is a property of the CAD geometry, not of the physical unit.
+
+**Measured per-finger travel `0.042726 m`** is the value this package ships as the
+`stroke` default. Caliper measurement of this gripper gives a total mechanical stroke of
+`85.452 mm`, i.e. `42.726 mm` per finger, and a closed clearance of `1.508 mm`. Because
+the real gripper does not reach the ideal zero-gap closure, the measured value is smaller
+— the conservative direction.
+
 At `stroke = 0.067` the two fingers would fully overlap and interpenetrate. The
 SolidWorks CSV declares `Limit Upper = 0.067` for the right finger and `-0.067` for the
 left; both are unusable as exported. Full derivation in
 [docs/design-notes.md](docs/design-notes.md#gripper-geometry).
+
+> ⚠️ Changing the limit to `0.042726` changes both travel endpoints of the model. The
+> mesh and TF checks recorded below were performed at the mesh-theoretical `0.0435`, so
+> the model's new endpoints still need a runtime mesh/TF re-verification before they can
+> be called geometrically verified.
 
 ---
 
@@ -312,7 +329,7 @@ left; both are unusable as exported. Full derivation in
 
 | Argument | Default | Description |
 | --- | --- | --- |
-| `stroke` | `0.0435` | Per-finger travel (m) — the joint limit `upper` |
+| `stroke` | `0.042726` | Per-finger travel (m) — the joint limit `upper`; measured value |
 | `effort` | `10.0` | Maximum joint effort (N) ⚠ placeholder |
 | `velocity` | `0.2` | Maximum joint velocity (m/s) ⚠ placeholder |
 | `joint_damping` | `0.05` | Joint damping ⚠ placeholder |

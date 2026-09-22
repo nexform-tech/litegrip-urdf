@@ -47,7 +47,7 @@ def generate_launch_description():
             'rvizconfig', default_value=default_rviz_config,
             description='RViz2 配置文件路径'),
         DeclareLaunchArgument(
-            'stroke', default_value='0.0435',
+            'stroke', default_value='0.042726',
             description='单指行程 (m)，即关节 limit 的 upper'),
         DeclareLaunchArgument(
             'effort', default_value='10.0',

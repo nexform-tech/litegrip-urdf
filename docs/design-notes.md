@@ -20,13 +20,16 @@ stages of that chain.
 | 1 | `夹爪urdf2.csv` | SolidWorks source of truth. Both joints are named `gripper_slide_joint` — **duplicate, illegal**. Travel limits `0.067` (right) and `-0.067` (left). |
 | 2 | `夹爪urdf改前.urdf` | Joint names still duplicated. Limits `0.067` / `-0.067`. **Fails to parse:** `joint 'gripper_slide_joint' is not unique`. |
 | 3 | `夹爪urdf2 (1).urdf` | Names split into `_right` / `_left`. Limits both written as `0.043.5` — a typo with a second decimal point. **Fails to parse:** `upper value (0.043.5) is not a valid float`. |
-| 4 | `litegrip_urdf` (this package) | Parses cleanly. Limits parametrized as `0.0435`. |
+| 4 | `litegrip_urdf` (this package) | Parses cleanly. Limits parametrized, defaulting to the measured value `0.042726`. |
 
 Both parse failures were confirmed by running `check_urdf` against the respective files.
 Note that stage 3 already attempted to correct the travel limit — but the intermediate
 value `0.043.5` is unparseable, so neither intermediate file is usable as a reference.
-**The geometry and inertia numbers in this package are byte-identical to the SolidWorks
-export; only the defects listed below were repaired.**
+**The mesh geometry and inertia numbers in this package are byte-identical to the
+SolidWorks export; only the defects listed below were repaired.** The one substantive
+exception is the travel limit, which now carries this gripper's measured calibration value
+rather than a value derived from the CAD geometry — see
+[Deriving the travel limit](#deriving-the-travel-limit).
 
 ---
 
@@ -67,22 +70,52 @@ The gripper closes when the two inner faces meet at `x = 0`. Solving `x_max(q) =
 q = 0.067 - 0.0235 = 0.0435
 ```
 
-Hence `stroke = 0.0435` m. The left finger is the mirror image and shares the same value.
+This gives the **mesh-theoretical closure** `0.0435` m — the joint value at which the two
+inner faces would meet exactly at `x = 0`. The left finger is the mirror image and shares
+the same value.
+
+Measuring this physical unit separately gives a different, smaller number: total
+mechanical stroke `85.452 mm`, per-finger travel `0.042726 m`, closed clearance
+`1.508 mm`, open opening `86.960 mm`. **The xacro limit therefore ships the measured
+`0.042726 m`**, and the mesh/TF relationship at the new endpoints still needs
+re-verification in RViz/Gazebo. `calibrate_guided` completed three runs: closed angle
+`0.041380–0.041400 rad`, open angle `-1.272790 rad` in every run, angular range
+`1.314170–1.314190 rad`, `rad_to_mm` `65.0226–65.0236 mm/rad`. Five endpoint rechecks gave
+a mechanical stroke of `85.43–85.47 mm`, mean `85.452 mm`, with corresponding `rad_to_mm`
+of `65.0053–65.0372 mm/rad`; the final calibration value is `65.0229 mm/rad`.
 
 **If `upper` were left at `0.067`, the fingers would overlap by 0.0235 m and
 interpenetrate completely.** Do not revert this value.
 
-### Verified behaviour at both travel limits
+### Behaviour at both travel limits
 
-Measured via `tf2_echo base_footprint <link>` against a running `robot_state_publisher`:
+The model endpoints below come from `tf2_echo base_footprint <link>` against a running
+`robot_state_publisher`; the measured column is caliper reading on this gripper. The
+updated limit still needs runtime re-checking.
 
 | Command | Finger origins | Inner faces | Opening |
 | --- | --- | --- | --- |
-| `[0.0, 0.0]` | `x = ∓0.067` | `x = ∓0.0435` | **87 mm** |
-| `[0.0435, 0.0435]` | `x = ∓0.0235` | `x = 0` | 0 (closed) |
+| `[0.0, 0.0]` | `x = ∓0.067` | model `x = ∓0.0435` | model **87 mm**; measured **86.960 mm** |
+| `[0.042726, 0.042726]` | measured closed position | measured closed position | measured clearance **1.508 mm** |
 
 The values in the "Finger origins" column match the joint origins in the URDF exactly at
 `q = 0`, which confirms the joint origins and the mesh bounding box are consistent.
+
+Because the measured closed clearance is not an ideal mesh contact value, the updated
+`0.042726` limit still requires a runtime mesh/TF check — it cannot yet be called
+geometrically verified.
+
+Caliper readings of commanded positions were recorded as well: `0 mm` gave
+`0.12, 0.04, 0.16, 0.06, 0.12 mm`; `20 mm` gave `20.40, 20.04, 20.08, 19.98, 18.80 mm`;
+`40 mm` gave `40.02, 40.20, 40.22, 39.86, 39.90 mm`; `60 mm` gave
+`60.22, 59.86, 60.02, 60.06, 59.98 mm`; `80 mm` gave `80.06, 80.10, 79.88, 80.02,
+79.96 mm`; `85.452 mm` gave `85.24, 85.52, 85.60, 85.40, 85.80 mm`. The `18.80 mm`
+reading at the `20 mm` position is a clear outlier; the maximum absolute error over the
+raw readings is `1.20 mm`, so position accuracy has not passed final acceptance and that
+point needs a re-test. Fifty cycles over `2 mm ↔ 83 mm` were completed: the closed-end
+opening drift from cycle 1 to cycle 50 was `+0.01 mm`, the open-end opening drift
+`+0.02 mm`, and both endpoint angle drifts were `+0.000009 rad`. That repeatability item
+is quantitatively complete.
 
 ---
 
@@ -97,12 +130,12 @@ axis, **both entries must carry the same sign** to move the fingers symmetricall
 | Command | Result |
 | --- | --- |
 | `[0.0, 0.0]` | Fully open |
-| `[0.0435, 0.0435]` | Fully closed |
+| `[0.042726, 0.042726]` | Measured closed calibration position |
 | `[0.02, -0.02]` | ❌ Fingers move in the same direction — not a grasp |
 
 The opposite axes are a property of the CAD model, not a defect introduced here; the
 SolidWorks CSV declares `Joint Axis X = 1` for one finger and `-1` for the other. Because
-`lower = 0` and `upper = 0.0435` for both joints, a symmetric "one positive, one negative"
+`lower = 0` and `upper = 0.042726` for both joints, a symmetric "one positive, one negative"
 command is not merely wrong but out of range for one of the joints.
 
 ---
@@ -134,13 +167,15 @@ The RViz configuration uses `base_footprint` as its fixed frame.
 
 ## Revision history against the SolidWorks export
 
-Everything below is a repair. **No geometric or inertial value was altered.**
+Everything below is a repair. **No geometric or inertial value was altered** — with one
+deliberate exception: the travel limit now carries this gripper's measured value (items 1
+and 3). That is a calibration decision, not a geometry edit.
 
 | # | Revision | Reason |
 | --- | --- | --- |
-| 1 | `<limit upper="0.043.5">` → parametrized `0.0435` | `0.043.5` is not a valid float; the export did not parse at all |
+| 1 | `<limit upper="0.043.5">` → parametrized measured value `0.042726` | `0.043.5` is not a valid float; the export did not parse at all |
 | 2 | Joint `gripper_slide_joint` → `gripper_slide_joint_right` / `_left` | Both joints carried the same name, which is illegal |
-| 3 | Left finger `upper` `-0.067` → `0.0435` | Negative upper bound with `lower = 0` is an invalid range |
+| 3 | Left finger `upper` `-0.067` → measured `0.042726` | Negative upper bound with `lower = 0` is an invalid range |
 | 4 | Added inertia-free root `base_footprint` | Removes the KDL `root link has an inertia` warning; see above |
 | 5 | Filled in empty material names (`name=""`) | Empty names are invalid; now `litegrip_base` and `litegrip_finger` |
 | 6 | Added `<dynamics damping friction>` | The export defined none; needed to damp simulation oscillation |
