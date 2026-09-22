@@ -10,14 +10,13 @@
 | **ROS 2 发行版** | Humble Hawksbill |
 | **目标平台** | Ubuntu 22.04 (x86_64) |
 | **包版本** | 1.0.0 |
-| **许可证** | [BSD-3-Clause](LICENSE) |
 | **模型来源** | SolidWorks URDF Exporter 1.6.0（几何与惯性参数未作改动） |
 
 ---
 
 ## 状态
 
-本包**尚未正式发布**。下表如实列出哪些部分已被实际执行与验证、哪些没有 ——
+下表如实列出哪些部分已被实际执行与验证、哪些没有 ——
 在依赖本包的任何部分之前，请先阅读此表。
 
 | 能力 | 状态 | 依据 |
@@ -30,8 +29,6 @@
 | `gazebo.launch.py` | ⚠️ **未验证** | 验证环境中未安装 Gazebo，从未执行 |
 | 参数 `effort`、`velocity` | ⚠️ **占位值** | SolidWorks 导出默认值，非实测。见[需要标定](#需要标定) |
 | 参数 `joint_damping`、`joint_friction` | ⚠️ **占位值** | 为抑制仿真振荡而选取的保守初值 |
-| 真机接入 | ⚠️ **未提供** | 包内不含任何厂商硬件插件；见[接入真机](#接入真机) |
-| `package.xml` 维护者 | ⚠️ **占位值** | 仍为 `TODO@example.com`；见[发布前检查清单](#发布前检查清单) |
 
 验证环境：ROS 2 Humble / Ubuntu 22.04 / `x86_64`，验证日期 2026-09-15。
 在你自己的平台上依赖上述任何 ✅ 项之前，请重新验证。
@@ -50,7 +47,6 @@ LiteGrip 是两指平行夹爪，由两个独立的 prismatic 关节驱动，每
 litegrip_urdf/
 ├── package.xml
 ├── CMakeLists.txt
-├── LICENSE
 ├── CHANGELOG.md
 ├── .markdownlint.json
 ├── .gitignore
@@ -362,12 +358,14 @@ ros2 launch litegrip_urdf ros2_control.launch.py hardware_plugin:=<厂商插件�
 以下事项**尚未完成**，在发布本包前必须解决：
 
 1. **维护者身份** —— `package.xml` 中仍为
-   `<maintainer email="TODO@example.com">LiteGrip</maintainer>`，
-   `LICENSE` 中的版权方也仅写作 `LiteGrip`。请替换为真实且法律上正确的实体名称与联系方式。
-2. **URL** —— `package.xml` 中的 `<url>` 指向 `https://example.com/litegrip`。
-3. **`effort` / `velocity` 标定** —— 见[需要标定](#需要标定)。
-4. **`joint_damping` / `joint_friction` 标定** —— 见[需要标定](#需要标定)。
-5. **Gazebo launch 验证** —— `gazebo.launch.py` 从未运行过。
+   `<maintainer email="TODO@example.com">LiteGrip</maintainer>`。
+   请替换为真实且法律上正确的实体名称与联系方式。
+2. **许可证未定** —— 本包尚未选定许可证。`package.xml` 中的 `<license>TODO</license>`
+   仅因 ROS 2 拒收不含 license 标签的包，不构成任何法律声明。
+3. **URL** —— `package.xml` 中的 `<url>` 指向 `https://example.com/litegrip`。
+4. **`effort` / `velocity` 标定** —— 见[需要标定](#需要标定)。
+5. **`joint_damping` / `joint_friction` 标定** —— 见[需要标定](#需要标定)。
+6. **Gazebo launch 验证** —— `gazebo.launch.py` 从未运行过。
 
 ## 已知限制
 
@@ -389,8 +387,3 @@ ros2 launch litegrip_urdf ros2_control.launch.py hardware_plugin:=<厂商插件�
 | [docs/design-notes.zh-CN.md](docs/design-notes.zh-CN.md) | 几何推导、关节约定、针对 SolidWorks 导出文件的修订记录、设计决策依据 |
 | [docs/troubleshooting.zh-CN.md](docs/troubleshooting.zh-CN.md) | 已知故障模式及其解决办法，含 Conda 构建失败与 `controller_manager` 命名坑 |
 | [CHANGELOG.md](CHANGELOG.md) | 版本历史（英文） |
-
-## 许可证
-
-[BSD-3-Clause](LICENSE)。URDF 模型源自 SolidWorks URDF Exporter 的导出结果，
-原始导出文件适用该导出器自身的许可条款。

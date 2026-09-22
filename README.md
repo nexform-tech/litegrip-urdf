@@ -10,16 +10,14 @@ RViz visualization, Gazebo simulation, and ros2_control hardware interface defin
 | **ROS 2 distribution** | Humble Hawksbill |
 | **Target platform** | Ubuntu 22.04 (x86_64) |
 | **Package version** | 1.0.0 |
-| **License** | [BSD-3-Clause](LICENSE) |
 | **Model source** | SolidWorks URDF Exporter 1.6.0 (geometry and inertia unchanged) |
 
 ---
 
 ## Status
 
-This package is **not yet released**. The table below states exactly what has been
-executed and verified, and what has not — read it before depending on any part of
-this package.
+The table below states exactly what has been executed and verified, and what has
+not — read it before depending on any part of this package.
 
 | Capability | Status | Evidence |
 | --- | --- | --- |
@@ -31,8 +29,6 @@ this package.
 | `gazebo.launch.py` | ⚠️ **Not verified** | Gazebo is not installed in the verification environment; never executed |
 | Parameters `effort`, `velocity` | ⚠️ **Placeholder** | SolidWorks export defaults, not measured. See [Calibration required](#calibration-required) |
 | Parameters `joint_damping`, `joint_friction` | ⚠️ **Placeholder** | Conservative values chosen to damp simulation oscillation |
-| Real hardware integration | ⚠️ **Not provided** | No vendor hardware plugin is included; see [Connecting real hardware](#connecting-real-hardware) |
-| `package.xml` maintainer | ⚠️ **Placeholder** | Still `TODO@example.com`; see [Pre-release checklist](#pre-release-checklist) |
 
 Verification was performed on ROS 2 Humble / Ubuntu 22.04 with `x86_64` on 2026-09-15.
 Re-verify on your own platform before relying on any ✅ above.
@@ -51,7 +47,6 @@ only installs `urdf/`, `launch/`, `config/`, and `meshes/` into `share/litegrip_
 litegrip_urdf/
 ├── package.xml
 ├── CMakeLists.txt
-├── LICENSE
 ├── CHANGELOG.md
 ├── .markdownlint.json
 ├── .gitignore
@@ -373,13 +368,15 @@ type in `config/litegrip_controllers.yaml` both need to change.
 
 The following are **incomplete** and must be resolved before this package is published:
 
-1. **Maintainer identity** — `package.xml` still carries `<maintainer email="TODO@example.com">LiteGrip</maintainer>`,
-   and `LICENSE` names the copyright holder only as `LiteGrip`. Replace both with the
-   real, legally correct entity and contact address.
-2. **URLs** — `package.xml` `<url>` entries point at `https://example.com/litegrip`.
-3. **`effort` / `velocity` calibration** — see [Calibration required](#calibration-required).
-4. **`joint_damping` / `joint_friction` calibration** — see [Calibration required](#calibration-required).
-5. **Gazebo launch validation** — `gazebo.launch.py` has never been run.
+1. **Maintainer identity** — `package.xml` still carries `<maintainer email="TODO@example.com">LiteGrip</maintainer>`.
+   Replace it with the real, legally correct entity and contact address.
+2. **License undecided** — no license has been chosen for this package. `package.xml`
+   carries `<license>TODO</license>` only because ROS 2 rejects a package without a
+   license tag; it is not a legal statement.
+3. **URLs** — `package.xml` `<url>` entries point at `https://example.com/litegrip`.
+4. **`effort` / `velocity` calibration** — see [Calibration required](#calibration-required).
+5. **`joint_damping` / `joint_friction` calibration** — see [Calibration required](#calibration-required).
+6. **Gazebo launch validation** — `gazebo.launch.py` has never been run.
 
 ## Known limitations
 
@@ -404,8 +401,3 @@ The following are **incomplete** and must be resolved before this package is pub
 | [docs/design-notes.md](docs/design-notes.md) | Geometry derivation, joint conventions, revision history against the SolidWorks export, rationale for design decisions |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Known failure modes and their resolutions, including the Conda build failure and the `controller_manager` naming pitfall |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
-
-## License
-
-[BSD-3-Clause](LICENSE). The URDF model derives from a SolidWorks URDF Exporter export;
-the exporter's own license terms apply to the original export artifacts.

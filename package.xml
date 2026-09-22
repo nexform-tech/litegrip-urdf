@@ -12,7 +12,9 @@
   <!-- ⚠ 发布前必填：维护者信息 -->
   <maintainer email="TODO@example.com">LiteGrip</maintainer>
 
-  <license>BSD-3-Clause</license>
+  <!-- ⚠ 许可证尚未确定。ROS 2 要求至少一个 license 标签，否则 colcon 拒包，
+       故此处以 TODO 占位，不作为任何法律声明。选定后请替换。 -->
+  <license>TODO</license>
 
   <url type="website">https://example.com/litegrip</url>
   <url type="bugtracker">https://example.com/litegrip/issues</url>

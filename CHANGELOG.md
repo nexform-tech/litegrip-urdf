@@ -26,7 +26,6 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
   SolidWorks export.
 - `docs/troubleshooting.md` and `docs/troubleshooting.zh-CN.md` — known failure modes
   and their resolutions.
-- `LICENSE` — BSD-3-Clause text, matching the license already declared in `package.xml`.
 - `.gitignore` — colcon build artifacts, Python caches, ROS runtime files, and editor
   and OS cruft.
 - `.markdownlint.json` — lint configuration shared with the other repositories.
