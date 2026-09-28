@@ -31,8 +31,24 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - `.markdownlint.json` — lint configuration shared with the other repositories.
 - `README.zh-CN.md` — Simplified Chinese translation of the README.
 - `CHANGELOG.md` — this file.
+- `gripper_opening_joint` — a single prismatic joint representing the gripper's only
+  drivetrain, and `gripper_opening_link`, the geometry-free dummy link that carries it.
+  The two finger joints are now `<mimic>` followers of it, so the model matches the
+  mechanism: one actuator, two fingers, no independent per-finger command.
+- `include_mock_ros2_control` xacro argument — suppresses this package's own
+  `<ros2_control>` block, for an upper-layer composition file that supplies a real
+  hardware component.
 
 ### Changed
+
+- The `<ros2_control>` block now declares a single commandable joint,
+  `gripper_opening_joint`, in place of the two finger joints, and the per-copy interface
+  count drops from 2 command + 4 state to 1 command + 2 state. Only the command value
+  changes shape; an integrator that sent a two-element array over
+  `/gripper_controller/commands` must now send one element.
+- `config/litegrip_controllers.yaml` and `config/joint_names_litegrip_urdf.yaml` list the
+  opening joint, and the controller note records why `GripperActionController` is now a
+  valid alternative.
 
 - Recorded the current physical calibration result: closed clearance `1.508 mm`, open
   opening `86.960 mm`, total mechanical stroke `85.452 mm`, per-finger URDF stroke

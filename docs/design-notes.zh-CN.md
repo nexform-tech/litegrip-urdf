@@ -160,6 +160,20 @@ RViz 配置使用的固定坐标系即为 `base_footprint`。
 
 第 1–3 项均已通过尝试解析对应源文件加以确认，见[来源沿革](#来源沿革)。
 
+### 单执行器接口
+
+上面的修订都是对导出的修复。下面两处不是修复，而是把导出从未表达的机构事实建模出来。
+
+- 新增**总控关节** `gripper_opening_joint`（由无几何 dummy link `gripper_opening_link`
+  承载），它成为唯一可命令的关节；两指关节变为它的 `<mimic>`
+  （`q = -0.5 × opening + stroke`）。真实夹爪只有一套传动 —— 两指从来就不能独立控制 ——
+  因此 MoveIt 规划组、ros2_control 块与关节滑块都只显示这一个关节。
+- `<ros2_control>` 块只声明该关节，`config/litegrip_controllers.yaml` 与
+  `config/joint_names_litegrip_urdf.yaml` 随之对齐。硬件只有一个命令通道，mimic 关系在
+  URDF 层生效，由 RSP 与 MoveIt 据此推算两指位置；给两指开命令接口等于暗示机构拥有
+  它并不具备的自由度。该块由 `include_mock_ros2_control` 控制是否输出，上层组合文件
+  可以用它换成真实硬件组件。
+
 ---
 
 ## 质量属性
