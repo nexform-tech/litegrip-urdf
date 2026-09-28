@@ -29,22 +29,20 @@ controller_manager:
 
 gripper_controller:
   ros__parameters:
-    # ⚠ 两关节 axis 方向相反（right = +X, left = -X），
-    #   因此下发指令时两关节取【同号值】才能使两指同向运动。
-    #   数组顺序即指令顺序：
-    #     [0] gripper_slide_joint_right
-    #     [1] gripper_slide_joint_left
-    #   0.0       -> 最大张开（两指内侧面理论 x = ±0.0435，模型开口 87 mm）
-    #   0.042726  -> 实测闭合标定位置（本机实测闭合间隙 1.508 mm）
-    #   ⚠ 关节 limit 的 upper 现取实测单指行程 0.042726，
-    #     mesh 理论闭合行程 0.0435 仅作几何参照。
+    # 只控**总控关节**：取值是相对闭合位的行程（m），不是两指内侧面间距的绝对值
+    # （两者相差一个模型闭合间隙，见 urdf/litegrip_urdf.urdf.xacro 文首）。
+    #   0.0      -> 实测闭合标定位（本机实测闭合间隙 1.508 mm）
+    #   0.085452 -> 全开（= 2 × 实测单指行程 0.042726；本机卡尺实测张开开口 86.960 mm）
+    # 两指（gripper_slide_joint_left/right）是它的 <mimic>：数值由总控关节唯一决定，
+    # 在 ros2_control 里没有命令接口，也不应被单独下指令。
     joints:
-      - gripper_slide_joint_right
-      - gripper_slide_joint_left
+      - gripper_opening_joint
 
 # ---------------------------------------------------------------------------
-# 说明：若需基于 Action 的抓取接口，可改用
-#   position_controllers/GripperActionController
-# 但该控制器只接受【单个】关节，需要为另一指配置 <mimic> 关节，
-# 且 mimic 在 ros2_control 中不会自动生效（依赖硬件接口或仿真器支持），
-# 故此处默认采用支持多关节的 JointGroupPositionController。
+# 说明：现在模型里只有一个可命令关节（总控关节），因此也可以用
+#   position_controllers/GripperActionController —— 它只接受单个关节，与当前的
+# URDF 结构正好匹配（两指是 <mimic>，不需要命令接口）。真实的硬件组件
+# （litegrip_ros2_control）就走这条路，因为它能直接表达「闭合到接触即停」，
+# 不必靠 goal_time: 0.0 放弃轨迹监控来换取同一个行为。
+# 本包自带的 mock 链路仍用 JointGroupPositionController：单关节的组控制器与
+# 多关节写法一致，将来若真加了独立自由度不用换控制器类型。

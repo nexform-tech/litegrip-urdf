@@ -188,6 +188,24 @@ and 3). That is a calibration decision, not a geometry edit.
 Items 1–3 were each confirmed by attempting to parse the corresponding source file; see
 [Source lineage](#source-lineage).
 
+### Single-actuator interface
+
+The revisions above repair the export. Two later changes are not repairs: they model an
+aspect of the mechanism the export never represented.
+
+- The **opening joint** `gripper_opening_joint`, carried by the geometry-free dummy link
+  `gripper_opening_link`, is now the only commandable joint; the two finger joints became
+  its `<mimic>` followers (`q = -0.5 × opening + stroke`). The real gripper has a single
+  transmission — the fingers were never independently controllable — so a MoveIt group,
+  the ros2_control block and a joint slider all show one joint.
+- The `<ros2_control>` block declares that joint only, and
+  `config/litegrip_controllers.yaml` and `config/joint_names_litegrip_urdf.yaml` follow it.
+  The hardware has one command channel, and the mimic relation is enforced at the URDF
+  level, where RSP and MoveIt use it to derive the fingers. Giving the fingers a command
+  interface would imply a freedom the mechanism does not have. The block is guarded by
+  `include_mock_ros2_control`, so a composition file can replace it with a real hardware
+  component.
+
 ---
 
 ## Mass properties

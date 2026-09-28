@@ -21,11 +21,11 @@
 
 | 能力 | 状态 | 依据 |
 | --- | --- | --- |
-| URDF/xacro 可解析 | ✅ 已验证 | `check_urdf` 报出根节点 `base_footprint` → `base_link` → 2 个手指 link |
+| URDF/xacro 可解析 | ✅ 已验证 | `check_urdf` 报出根节点 `base_footprint` → `base_link` → `gripper_opening_link` 与 2 个手指 link |
 | `colcon build` | ✅ 已验证 | 在 ROS 2 Humble 上构建通过；见[已知环境问题](docs/troubleshooting.zh-CN.md#conda-的-python3-导致构建失败) |
 | `display.launch.py` | ✅ 已验证 | 可启动，`stroke:=` 覆盖值能传入 URDF |
 | `ros2_control.launch.py` | ✅ 已验证 | 两个控制器均达到 `active`；位置指令回路已确认 |
-| 关节几何（行程 ↔ 开口） | ⚠️ **待重新验证** | TF 复核是在 mesh 理论行程 `0.0435` 两端做的；现默认限位已改为实测值 `0.042726`，两端位形需重新复核 |
+| 关节几何（总控关节 ↔ 两指行程） | ⚠️ **待重新验证** | TF 复核是在 mesh 理论行程 `0.0435` 两端做的；现在两端由总控关节经 `<mimic>` 驱动到实测值 `0.042726`，需重新复核 |
 | `gazebo.launch.py` | ⚠️ **未验证** | 验证环境中未安装 Gazebo，从未执行 |
 | 参数 `effort`、`velocity` | ⚠️ **占位值** | SolidWorks 导出默认值，非实测。见[需要标定](#需要标定) |
 | 参数 `joint_damping`、`joint_friction` | ⚠️ **占位值** | 为抑制仿真振荡而选取的保守初值 |
@@ -37,7 +37,8 @@
 
 ## 概述
 
-LiteGrip 是两指平行夹爪，由两个独立的 prismatic 关节驱动，每指一个。
+LiteGrip 是两指平行夹爪，两指由**同一个电机经导轨对开**，因此模型对外只有一个
+可命令的 prismatic 关节 `gripper_opening_joint`，两指是它的 `<mimic>`。
 两指沿 `base_link` 的 X 轴做对称运动。
 
 本包是纯描述包，不含任何编译产物 —— `CMakeLists.txt` 仅将 `urdf/`、`launch/`、
@@ -191,21 +192,21 @@ ros2 control list_controllers
 # joint_state_broadcaster 与 gripper_controller 均应显示 [active]。
 
 ros2 control list_hardware_interfaces
-# 2 个 command 接口（已 claimed）+ 4 个 state 接口 = 共 6 个。
+# 1 个 command 接口（已 claimed）+ 2 个 state 接口 = 共 3 个。
 
-# 下发位置指令（顺序：右指, 左指）
+# 下发位置指令：只有一个值，即总控关节的行程
 ros2 topic pub --once /gripper_controller/commands \
-  std_msgs/msg/Float64MultiArray "{data: [0.042726, 0.042726]}"
+  std_msgs/msg/Float64MultiArray "{data: [0.0]}"
 
 ros2 topic echo /joint_states
 ```
 
-> ⚠️ **mock 硬件不会对越界指令做限幅。** 在上述配置下，`[0.05, 0.05]` 超出
-> `stroke = 0.042726`，但既不会报错也不会被截断，会原样回读为 `0.05` —— 尽管接口上
-> 声明了 `min`/`max` 参数。在该配置下，行程限制只是描述性元数据，而非强制性约束。
-> 请在你自己的应用层做指令限幅。
+> ⚠️ **mock 硬件不会对越界指令做限幅。** 在上述配置下，`[0.1]` 超出总控关节的
+> `upper = 0.085452`（= 2 × `stroke`），但既不会报错也不会被截断，会原样回读为
+> `0.1` —— 尽管接口上声明了 `min`/`max` 参数。在该配置下，行程限制只是描述性元数据，
+> 而非强制性约束。请在你自己的应用层做指令限幅。
 >
-> ℹ️ `/joint_states` 中 `effort` 为 `[nan, nan]`。mock 硬件未声明 effort 状态接口，
+> ℹ️ `/joint_states` 中被控关节的 `effort` 为 `nan`。mock 硬件未声明 effort 状态接口，
 > 因此没有可发布的值。这是预期行为，不是错误。
 
 ### 3. Gazebo 仿真
@@ -228,8 +229,13 @@ ros2 launch litegrip_urdf gazebo.launch.py
 
 | 关节名 | 类型 | axis | 关节原点（`base_link` 系） | 限位 |
 | --- | --- | --- | --- | --- |
-| `gripper_slide_joint_right` | prismatic | `+X` | `(-0.067, 0.0010833, 0.034083)` | `[0, 0.042726]` m |
-| `gripper_slide_joint_left` | prismatic | `-X` | `( 0.067, -0.0010833, 0.034083)` | `[0, 0.042726]` m |
+| `gripper_opening_joint` | prismatic | `+X` | `(0, 0, 0)` | `[0, 0.085452]` m |
+| `gripper_slide_joint_right` | prismatic | `+X` | `(-0.067, 0.0010833, 0.034083)` | `[0, 0.042726]` m，`<mimic>` |
+| `gripper_slide_joint_left` | prismatic | `-X` | `( 0.067, -0.0010833, 0.034083)` | `[0, 0.042726]` m，`<mimic>` |
+
+只有 `gripper_opening_joint` 可命令。两指关节是它的 `<mimic>`
+（`multiplier = -0.5`、`offset = stroke`），数值由总控关节唯一决定，不能让它们独立
+运动 —— 真实夹爪只有一套传动，两指由它经导轨对开。
 
 ### 连杆
 
@@ -237,6 +243,7 @@ ros2 launch litegrip_urdf gazebo.launch.py
 | --- | --- | --- | --- |
 | `base_footprint` | — | 根节点，无惯性 | 0 |
 | `base_link` | `base_footprint` | `base_footprint_joint`（fixed） | 0.5063 kg |
+| `gripper_opening_link` | `base_link` | `gripper_opening_joint` | 0（无几何 dummy） |
 | `gripper_slider_link1` | `base_link` | `gripper_slide_joint_right` | 0.03545 kg |
 | `gripper_slider_link2` | `base_link` | `gripper_slide_joint_left` | 0.03545 kg |
 
@@ -244,43 +251,49 @@ ros2 launch litegrip_urdf gazebo.launch.py
 TF 树具有合法树根：KDL 不支持带惯性的 root link，否则会告警并静默忽略 `base_link`
 的惯性。**将夹爪安装到机械臂时，请以 `base_footprint` 作为附着基准。**
 
+`gripper_opening_link` 承载总控关节的自由度。URDF 的关节必须有子 link，而它既无几何
+也无惯性，因此不参与碰撞检查，只是规划链的链尾。
+
 ### ros2_control 接口
 
 | 关节 | command 接口 | state 接口 |
 | --- | --- | --- |
-| `gripper_slide_joint_right` | `position` | `position`、`velocity` |
-| `gripper_slide_joint_left` | `position` | `position`、`velocity` |
+| `gripper_opening_joint` | `position` | `position`、`velocity` |
 
-**每份模型共 6 个接口。**（本文档早期版本写的是 4 个，正确数量为 2 command + 4 state。）
+**每份模型共 3 个接口**（1 command + 2 state）。两指关节不声明任何接口：它们在 URDF
+里是 `<mimic>`，而 ros2_control 不会给 mimic 关节命令口。
 
 ### 控制器
 
 `position_controllers/JointGroupPositionController`，节点为 `/gripper_controller`。
 
-指令数组的顺序即 `config/litegrip_controllers.yaml` 中的顺序：
+指令数组只有一个元素，顺序即 `config/litegrip_controllers.yaml` 中的顺序：
 
 | 下标 | 关节 |
 | --- | --- |
-| `[0]` | `gripper_slide_joint_right` |
-| `[1]` | `gripper_slide_joint_left` |
+| `[0]` | `gripper_opening_joint` |
 
 ---
 
 ## ⚠️ 关节符号约定 —— 编写控制器前必读
 
-**两个关节的 `axis` 方向相反：right 为 `+X`，left 为 `-X`。
-因此两关节取【同号值】才能使两指做对称运动。**
+**只有 `gripper_opening_joint` 可命令。** 取值是相对闭合位的行程，两指通过 `<mimic>`
+跟随它；没有第二个指令值，因此下面这个坑在**下发指令**时不再适用。
 
-| 指令 | 结果 |
-| --- | --- |
-| `[0.0, 0.0]` | 完全张开 —— 模型内侧面位于 `x = ∓0.0435`，模型开口 **87 mm**；本机卡尺实测张开开口 **86.960 mm** |
-| `[0.02, 0.02]` | 半闭合 |
-| `[0.042726, 0.042726]` | 实测闭合标定位置 —— 本机卡尺实测闭合间隙 **1.508 mm** |
+但直接读取两指关节值时它仍然成立 —— 例如核对 mesh / TF，或在绕过 mimic 的工具里
+直接驱动两指时。**两指的 `axis` 方向相反：right 为 `+X`，left 为 `-X`。两者的 mimic
+取同一个 multiplier，因此两指关节取【同号值】才能做对称运动。**
 
 **按「一正一负」的直觉编写控制器，会让两指反向运动而非相向运动。**
-该结论已通过实测确认：指令 `[0, 0]` 时两指原点位于 `x = ∓0.067`（模型内侧面在
+该结论已通过实测确认：`q = 0` 时两指原点位于 `x = ∓0.067`（模型内侧面在
 `∓0.0435`）；而按 mesh 理论闭合值 `0.0435`，两指原点应位于 `x = ∓0.0235`
 （内侧面在 `x = 0`，零间隙）。现默认限位 `0.042726` 略小于该理论值，停在实测闭合位置。
+
+| 下发给 `gripper_opening_joint` | 两指关节实际取值 | 结果 |
+| --- | --- | --- |
+| `[0.0]` | `[0.042726, 0.042726]` | 实测闭合标定位置 —— 本机卡尺实测闭合间隙 **1.508 mm** |
+| `[0.042726]` | `[0.021363, 0.021363]` | 半闭合 |
+| `[0.085452]` | `[0.0, 0.0]` | 完全张开 —— 模型内侧面位于 `x = ∓0.0435`，模型开口 **87 mm**；本机卡尺实测张开开口 **86.960 mm** |
 
 ### 为何行程是 0.042726 而非 0.067
 
@@ -323,11 +336,12 @@ gripper_slider_link1.STL 的 X 范围 = [-0.00095, +0.0235]   （包围盒实测
 | `joint_damping` | `0.05` | 关节阻尼 ⚠ 占位值 |
 | `joint_friction` | `0.02` | 关节摩擦 ⚠ 占位值 |
 | `hardware_plugin` | `mock_components/GenericSystem` | ros2_control 硬件插件 |
+| `include_mock_ros2_control` | `true` | 是否输出本文件自带的 `<ros2_control>` 块。上层组合文件接入真实硬件组件时必须置 `false` —— 两个块都声明 `gripper_opening_joint`，同时出现会让 ros2_control 拒绝加载 |
 
 **参数覆盖方式。** `stroke`、`effort`、`velocity` 已由 `display.launch.py` 与
 `ros2_control.launch.py` 暴露为 launch 参数，可在命令行直接覆盖。
-`joint_damping` 与 `joint_friction` **未被任何 launch 文件暴露** —— 要修改它们，
-只能改 xacro 默认值，或直接调用 `xacro`。
+`joint_damping`、`joint_friction` 与 `include_mock_ros2_control` **未被任何 launch
+文件暴露** —— 只能直接调用 `xacro` 传入，这也正是上层组合文件的做法。
 
 单独展开为纯 URDF（供不支持 xacro 的工具使用）：
 
@@ -356,10 +370,12 @@ xacro $(ros2 pkg prefix litegrip_urdf)/share/litegrip_urdf/urdf/litegrip_urdf.ur
 ros2 launch litegrip_urdf ros2_control.launch.py hardware_plugin:=<厂商插件名>
 ```
 
-你的插件需要为两个关节提供：
+你的插件需要为 `gripper_opening_joint` 提供：
 
 - 一个 `position` **command** 接口
 - `position` 与 `velocity` **state** 接口
+
+两指关节不需要任何接口：模型用 `<mimic>` 驱动它们。
 
 本包不附带任何厂商插件。若你的硬件提供的是 `velocity` 或 `effort` 指令而非 `position`，
 则 xacro 中的 `<ros2_control>` 块与 `config/litegrip_controllers.yaml` 中的控制器类型

@@ -17,12 +17,17 @@
     5. 补充 <ros2_control> 硬件接口描述。
 
   坐标系与关节约定（重要，请务必阅读后使用）：
-    · 两指的 prismatic axis 方向相反：right 为 +X，left 为 -X。
-    · 因此 **两个关节取同号值 = 两指向同一方向运动**（同号闭合、同号张开）。
-      按「一正一负」的直觉编写控制器会导致两指反向运动。
-    · joint = 0         两指内侧面位于 x = ±0.0435，处于最大张开位（模型开口 87 mm，
-                        本机卡尺实测张开开口 86.960 mm）
-    · joint = 0.042726  实测闭合标定位置（本机实测闭合间隙 1.508 mm）
+    · 真实夹爪只有一套传动：两指由同一个电机经导轨对开，**没有独立自由度**。
+      本文件把这一点固化成模型结构：对外只有一个 `gripper_opening_joint`
+      （prismatic），两指通过 <mimic> 跟随它，没有独立的命令口：
+        q_finger = −0.5 × opening + stroke
+    · 两指的 prismatic axis 方向相反：right 为 +X，left 为 -X。两者的 mimic
+      取同一个 multiplier，因此**同号运动 = 同开同合**。按「一正一负」的直觉
+      编写控制器会导致两指反向运动。
+    · opening = 0          ⇒ q_finger = stroke，实测闭合标定位
+                            （本机实测闭合间隙 1.508 mm）
+    · opening = 2 × stroke ⇒ q_finger = 0，最大张开位
+                            （本机卡尺实测张开开口 86.960 mm）
 
   行程取值的两个口径（勿混）：
     · mesh 理论闭合行程 0.0435 m —— 由 mesh 包围盒核算：
@@ -43,6 +48,8 @@
   <!-- 单指行程 (m)，即关节 limit 的 upper。默认值 = 本机实测单指行程；
        mesh 理论值为 0.0435，如需与 CAD 几何严格一致可显式传 stroke:=0.0435 -->
   <xacro:arg name="stroke" default="0.042726"/>
+  <!-- stroke 的 property 副本：xacro 的 ${} 表达式里取不到 arg，只能按属性引用 -->
+  <xacro:property name="stroke_arg" value="$(arg stroke)"/>
   <!-- 关节最大输出力 (N)。⚠ 10.0 为 SolidWorks 导出默认占位值，请按实际电机/传动标定 -->
   <xacro:arg name="effort" default="10.0"/>
   <!-- 关节最大速度 (m/s)。⚠ 0.2 同为导出默认占位值，请按实测标定 -->
@@ -53,6 +60,15 @@
   <!-- ros2_control 硬件插件。默认 mock 插件仅用于打通控制链路与仿真；
        ⚠ 接入真机时请替换为厂商硬件接口插件 -->
   <xacro:arg name="hardware_plugin" default="mock_components/GenericSystem"/>
+  <!--
+    是否输出本文件自带的 mock <ros2_control> 块。
+
+    ★ 默认 true（保持本包单独使用时的原有行为）。但当一个上层组合文件要接入
+      **真实**硬件组件时（litegrip_ros2_control 的 <ros2_control> 块），必须把它
+      设为 false：两个块都声明同一个 `gripper_opening_joint`，同时出现会让
+      ros2_control 因为关节接口重复而拒绝加载。
+  -->
+  <xacro:arg name="include_mock_ros2_control" default="true"/>
 
   <!-- ======================== 材质定义 ======================== -->
   <material name="litegrip_base">
@@ -105,6 +121,35 @@
     </collision>
   </link>
 
+  <!-- ======================== 总控关节（对外接口） ======================== -->
+  <!--
+    真实夹爪只有一套传动：两指由同一个电机经导轨对开，**没有独立自由度**。
+    这里把这一点固化成模型结构：对外只有一个 `gripper_opening_joint`，
+    两指通过 <mimic> 跟随它，没有独立的命令口。
+
+        q_finger = multiplier × opening + offset
+                 = −0.5 × opening + stroke
+    opening = 0          ⇒ q_finger = stroke，实测闭合标定位
+    opening = 2 × stroke ⇒ q_finger = 0，最大张开位
+
+    该取值是**相对闭合位的行程**，不是两指内侧面间距的绝对值：两者相差一个
+    模型闭合间隙（由 mesh 几何给定，与实测的 1.508 mm 相差约 0.04 mm）。
+    上层若需要绝对开口，应自行加上该间隙。
+
+    `gripper_opening_link` 是承载该自由度的无几何、无惯性 dummy link
+    （URDF 的关节必须有子 link；它同时也是 MoveIt 规划组的链尾，
+    不参与碰撞检查，因为没有任何 collision 元素）。
+  -->
+  <link name="gripper_opening_link"/>
+
+  <joint name="gripper_opening_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="gripper_opening_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0.0" upper="${2.0 * float(stroke_arg)}" effort="$(arg effort)" velocity="$(arg velocity)"/>
+  </joint>
+
   <!-- ======================== 指 1（右指） ======================== -->
   <link name="gripper_slider_link1">
     <inertial>
@@ -144,6 +189,8 @@
       effort="$(arg effort)"
       velocity="$(arg velocity)"/>
     <dynamics damping="$(arg joint_damping)" friction="$(arg joint_friction)"/>
+    <!-- 由总控关节唯一决定：q = −0.5 × opening + stroke（见文首约定） -->
+    <mimic joint="gripper_opening_joint" multiplier="-0.5" offset="$(arg stroke)"/>
   </joint>
 
   <!-- ======================== 指 2（左指） ======================== -->
@@ -185,11 +232,15 @@
       effort="$(arg effort)"
       velocity="$(arg velocity)"/>
     <dynamics damping="$(arg joint_damping)" friction="$(arg joint_friction)"/>
+    <!-- 由总控关节唯一决定：q = −0.5 × opening + stroke（见文首约定） -->
+    <mimic joint="gripper_opening_joint" multiplier="-0.5" offset="$(arg stroke)"/>
   </joint>
 
   <!-- ======================== ros2_control 硬件接口 ======================== -->
   <!--
-    两关节的 command/state interface 均声明为 position，
+    只声明**总控关节**一个 command/state interface：真爪硬件只有一套传动（一个电机），
+    两指是它的 mimic，在 ros2_control 里没有独立的命令口（mimic 在 URDF 层生效，
+    供 RSP/MoveIt 推算两指位置；ros2_control 侧不需要也不应该给两指开命令接口）。
     与 config/litegrip_controllers.yaml 中 JointGroupPositionController 的配置对应。
 
     hardware_plugin 默认为 mock_components/GenericSystem：
@@ -198,29 +249,25 @@
     接入真机时通过 launch 参数覆盖：
       ros2 launch litegrip_urdf ros2_control.launch.py \
         hardware_plugin:=<厂商插件名>
+
+    该块由 include_mock_ros2_control 控制是否输出（见文首参数说明）：
+    上层组合文件接入真实硬件组件时必须置 false。
   -->
+  <xacro:if value="$(arg include_mock_ros2_control)">
   <ros2_control name="litegrip_system" type="system">
     <hardware>
       <plugin>$(arg hardware_plugin)</plugin>
     </hardware>
 
-    <joint name="gripper_slide_joint_right">
+    <joint name="gripper_opening_joint">
       <command_interface name="position">
         <param name="min">0.0</param>
-        <param name="max">$(arg stroke)</param>
-      </command_interface>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-
-    <joint name="gripper_slide_joint_left">
-      <command_interface name="position">
-        <param name="min">0.0</param>
-        <param name="max">$(arg stroke)</param>
+        <param name="max">${2.0 * float(stroke_arg)}</param>
       </command_interface>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
     </joint>
   </ros2_control>
+  </xacro:if>
 
 </robot>

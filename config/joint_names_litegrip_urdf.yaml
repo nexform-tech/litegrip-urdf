@@ -1,5 +1,6 @@
 # 关节名清单，供 MoveIt Setup Assistant 等工具导入使用。
-# 顺序与 URDF 中 <joint> 的声明顺序一致。
+# 只列**可命令**的关节：真实夹爪只有一套传动，因此对外只有总控关节
+# gripper_opening_joint（取值是相对闭合位的行程）。两指
+# （gripper_slide_joint_left/right）是它的 <mimic>，没有独立命令口。
 controller_joint_names:
-  - gripper_slide_joint_right
-  - gripper_slide_joint_left
+  - gripper_opening_joint
